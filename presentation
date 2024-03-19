@@ -1,0 +1,243 @@
+'use strict'
+// 1行目に記載している 'use strict' は削除しないでください
+
+//タイヤキ製造と型メンテナンス計画作成プログラム
+
+//タイヤキ製造する型の情報
+const taiyakiInfo = [
+  {type:"bream",serial:1,machineSerial:"A",status:"active",maintenance:4000}, //タイ
+  {type:"bream",serial:2,machineSerial:"",status:"stock",maintenance:4000},
+  {type:"whale",serial:1,machineSerial:"B",status:"active",maintenance:4000}, //クジラ
+  {type:"whale",serial:2,machineSerial:"",status:"stock",maintenance:4000},
+  {type:"tuna",serial:1,machineSerial:"C",status:"active",maintenance:4000}, //マグロ
+  {type:"tuna",serial:2,machineSerial:"",status:"stock",maintenance:4000}
+];
+
+//日々の生産数
+const productNum = {
+  bream:600,
+  whale:400,
+  tuna:500
+};
+
+//開始日
+const startDay = new Date();
+
+//終了日
+const endDay = new Date();
+endDay.setDate(endDay.getDate() + 30);
+
+//結果を入れる箱
+const dailyUpdates = [];
+
+//1ヶ月分の生産計画を作成
+function productPlan(Info, pNum, start, end) {
+  let countDay = new Date(start);
+  const updateInfo = [...Info];
+  while (countDay < end) {
+    for (const row of updateInfo) {
+      if (row["status"] == "active") {
+        row["maintenance"] -= pNum[row["type"]];
+        if (row["maintenance"] < 0) {
+          let activeRow = updateInfo.find(i => i.type === row["type"] && i.serial === row["serial"]);
+          if (activeRow) {
+            activeRow["status"] = "maint";
+            activeRow["maintenance"] += pNum[row["type"]];
+            let mSerial = activeRow["machineSerial"];
+            activeRow["machineSerial"] = "";
+            let stockRow = updateInfo.find(i => i.type === row["type"] && i.status === "stock");
+            if (stockRow) {
+              stockRow["status"] = "active";
+              stockRow["machineSerial"] = mSerial;
+            }
+          }
+        }
+      } else {
+        if (row["status"] === "maint") {
+          row["status"] = "stock";
+          row["maintenance"] = 4000
+        }
+      }
+      row["day"] = countDay.toISOString().split('T')[0];
+      const updateRow = {...row};
+      dailyUpdates.push(updateRow);
+    }
+    countDay.setDate(countDay.getDate() + 1);
+  }
+}
+
+//計画作成する関数呼び出し
+productPlan(taiyakiInfo, productNum, startDay, endDay);
+
+console.log(dailyUpdates)
+
+//ボタンクリックで計画を表示
+const create = document.getElementById("createPlan")
+create.addEventListener("click", createPlan)
+
+//縦持ちの計画をtype・serialでグループ化し横持ちにして表示
+function createPlan() {
+  const galleryContainer = document.getElementById('gallery-container');
+  // 日付配列作成
+  const days = [];
+  for (let i = 0; i < 30; i++) {
+    const start = new Date(startDay);
+    start.setDate(start.getDate() + i);
+    days.push(start.toISOString().split('T')[0]);
+  }
+  // typeとserialの組み合わせでグループ化
+  const groupedItems = dailyUpdates.reduce((acc, obj) => {
+    const key = `${obj.type}-${obj.serial}`;
+    if (!acc[key]) {
+      acc[key] = { type: obj.type, serial: obj.serial, days: {} };
+    }
+    acc[key].days[obj.day] = obj;
+    return acc;
+  }, {});
+
+  // テーブルを生成
+  const table = document.createElement('table');
+  table.className = 'gallery-table';
+
+  // ヘッダー行を追加
+  const thead = table.createTHead();
+  const headerRow = thead.insertRow();
+  headerRow.insertCell().textContent = 'type';
+  headerRow.insertCell().textContent = 'Serial';
+  days.forEach(day => {
+    const dayHeader = document.createElement('th');
+    dayHeader.colSpan = "1";
+    dayHeader.textContent = day;
+    headerRow.appendChild(dayHeader);
+  });
+
+  // テーブルボディを生成
+  const tbody = document.createElement('tbody');
+  table.appendChild(tbody);
+
+  // グループ化したアイテムごとに行を追加
+  Object.values(groupedItems).forEach(group => {
+    const row = tbody.insertRow();
+    
+    // typeのセルを追加
+    const typeCell = row.insertCell();
+    typeCell.textContent = group.type;
+    typeCell.rowSpan = "2";
+    
+    // serialのセルを追加
+    const serialCell = row.insertCell();
+    serialCell.textContent = group.serial;
+    serialCell.rowSpan = "2";
+    
+    // 各日付のデータを追加（machineSerial情報）
+    days.forEach(day => {
+      const dayCell = row.insertCell();
+      const dayData = group.days[day];
+      if (dayData) {
+        dayCell.textContent = dayData.machineSerial || dayData.status;
+      }
+    });
+  
+    // 新しい行を追加してmaintenance情報を埋める
+    const maintenanceRow = tbody.insertRow();
+    days.forEach(day => {
+      const dayCell = maintenanceRow.insertCell();
+      const dayData = group.days[day];
+      if (dayData) {
+        dayCell.textContent = dayData.maintenance;
+      }
+    });
+  });
+
+  // コンテナにテーブルを追加
+  galleryContainer.appendChild(table);
+}
+
+//console.log(dailyUpdates)
+
+----------------------------------------------------------------------------------
+
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+  <meta name="theme-color" content="#000000">
+  <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+  <h1>タイヤキ生産計画自動作成</h1>
+  <h2> <font color="blue">計画作成</font>ボタンを押して下さい</h2>
+  <div class="image-button-container">
+    <img src="taiyaki.jfif" alt="たい焼きの画像">
+    <button id="createPlan">計画作成</button>
+  </div>
+  <h3>1ヶ月分の生産計画です</h3>
+  <div id="gallery-container"></div>
+  <script type="text/javascript" src="script.js"></script>
+</body>
+
+</html>
+
+------------------------------------------------------------------------------------
+
+#gallery-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px; /* アイテム間の隙間 */
+  padding: 16px;
+  /* border: 1px solid black; */
+}
+  
+.gallery-item {
+  flex: 0 1 calc(33.333% - 16px); /* 3列レイアウトを基本とする */
+  border: 1px solid black;
+  padding: 8px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+/* テーブル全体に適用するスタイル */
+table {
+  border-collapse: collapse; /* セル間の罫線を1本にまとめる */
+  width: 100%; /* テーブルの幅を指定 */
+}
+
+/* テーブルのセルに適用するスタイル */
+td, th {
+  border: 1px solid black; /* 罫線のスタイルを指定 */
+  text-align: center; /* セル内のテキストの配置を指定 */
+  padding: 8px; /* セル内のパディングを指定 */
+}
+
+/* ヘッダー行のスタイル */
+th {
+  background-color: #f2f2f2; /* 背景色を指定 */
+}
+
+.image-button-container {
+  display: flex;
+  align-items: center; /* 中央揃えにする */
+  gap: 50px; /* 画像とボタンの間隔 */
+}
+
+/* 必要に応じて、画像やボタンにも追加のスタイリングを適用できます */
+.image-button-container img {
+  width: 300px; /* 画像のサイズ調整 */
+  height: 200px;
+}
+
+.image-button-container button {
+  padding: 5px 10px; /* ボタンのパディング調整 */
+  border-radius: 10px;
+  width: 300px;
+  height: 200px;
+  font-size: 200%;
+  color: white;
+  background-color: green;
+}
+
+.image-button-container button:hover {
+  background-color: #214e22; /* ホバー時の背景色を少し暗く */
+}
