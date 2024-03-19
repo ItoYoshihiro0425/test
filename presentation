@@ -38,11 +38,11 @@ function productPlan(Info, pNum, start, end) {
     for (const row of updateInfo) {
       if (row["status"] == "active") {
         row["maintenance"] -= pNum[row["type"]];
-        if (row["maintenance"] < 0) {
-          let activeRow = updateInfo.find(i => i.type === row["type"] && i.serial === row["serial"]);
+        if (row["maintenance"] - pNum[row["type"]] < 0) {
+          let activeRow = row;
           if (activeRow) {
             activeRow["status"] = "maint";
-            activeRow["maintenance"] += pNum[row["type"]];
+            //activeRow["maintenance"] += pNum[row["type"]];
             let mSerial = activeRow["machineSerial"];
             activeRow["machineSerial"] = "";
             let stockRow = updateInfo.find(i => i.type === row["type"] && i.status === "stock");
@@ -52,11 +52,23 @@ function productPlan(Info, pNum, start, end) {
             }
           }
         }
-      } else {
-        if (row["status"] === "maint") {
+      } else if (row["status"] === "maint") {
           row["status"] = "stock";
           row["maintenance"] = 4000
-        }
+
+
+          
+      } else {
+          let oldDay = new Date(countDay);
+          oldDay.setDate(oldDay.getDate() - 1);
+          oldDay = oldDay.toISOString().split('T')[0];
+          //console.log(oldDay)
+          let oldRow = dailyUpdates.find(i => i.type === row["type"] && i.maintenance < (pNum[row["type"]] * 2) && i.day === oldDay);
+          if (oldRow) {
+            console.log(oldDay)
+            row["machineSerial"] = oldRow["machineSerial"];
+            row["status"] = "active";
+          }
       }
       row["day"] = countDay.toISOString().split('T')[0];
       const updateRow = {...row};
